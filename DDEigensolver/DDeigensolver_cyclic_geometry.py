@@ -8,7 +8,11 @@ import amfe
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+import time
+from datetime import datetime
 
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+print(date_str)
 
 Nsectors = 24
 domain_label = 4
@@ -142,24 +146,51 @@ feti_obj2 = SerialFETIsolver(M_dict,B_dict,f_dict,tolerance=1.0e-12)
 manager = feti_obj1.manager 
 managerM = feti_obj2.manager
 
+print('Assembling Matrix')
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+print(date_str)
 
 B = manager.assemble_global_B()
-
 M_,_ = managerM.assemble_global_K_and_f()
 K, _ = manager.assemble_global_K_and_f()
 M = M_
 
+save_object(B,'B.pkl')
+save_object(M,'M.pkl')
+save_object(K,'K.pkl')
+
 L = manager.assemble_global_L()
 Lexp = manager.assemble_global_L_exp()
 
+save_object(L,'L.pkl')
+save_object(Lexp,'Lexp.pkl')
+
+
 Kp = L.dot(K.dot(Lexp))
 Mp = L.dot(M.dot(Lexp))
-Dp = np.linalg.inv(Kp).dot(Mp)
+lu = sparse.splu(Kp)
+Dp = sparse.LinearOperator(shape=Kp.shape, matvec lambda : x lu.solve(Mp.dot(x)))
 nmodes = 5
 
+
+print('Solving Eigenvalue')
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+print(date_str)
 eigval_, Vp = sparse.linalg.eigsh(Dp,k=nmodes)
 val_p = np.sort(1/eigval_)
 freq_p = np.sqrt(val_p)/(2.0*np.pi)
+
+
+print('Salving solution')
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+print(date_str)
+
+save_object(Vp,'Vp.pkl')
+save_object(eigval_,'eigval_.pkl')
+
+print('Solving Eigenvalue')
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+print(date_str)
 
 Vprimal = Lexp.dot(Vp)
 
@@ -180,12 +211,16 @@ def plot_system_list(system_list,mode_id):
     plt.legend('off')
     
 
-system_list = update_system(system_list,Vprimal)
+#system_list = update_system(system_list,Vprimal)
 
 
-BBT_inv = np.linalg.pinv(B.A.dot(B.A.T))
+#BBT_inv = np.linalg.pinv(B.A.dot(B.A.T))
 #scaling = manager.assemble_global_scaling()
 #S = np.diag(1./scaling)
 #BBT_inv_tilde = B.dot(S).dot(S.dot(B.T))
-BBT_inv_tilde = BBT_inv
-P = sparse.LinearOperator(shape=K.shape, matvec = lambda x : x - B.T.dot(BBT_inv_tilde.dot(B.dot(x))))
+#BBT_inv_tilde = BBT_inv
+#P = sparse.LinearOperator(shape=K.shape, matvec = lambda x : x - B.T.dot(BBT_inv_tilde.dot(B.dot(x))))
+
+print('End')
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+print(date_str)

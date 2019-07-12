@@ -11,7 +11,7 @@ import copy
 import time
 from datetime import datetime
 
-date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 print(date_str)
 
 Nsectors = 24
@@ -147,7 +147,7 @@ manager = feti_obj1.manager
 managerM = feti_obj2.manager
 
 print('Assembling Matrix')
-date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 print(date_str)
 
 B = manager.assemble_global_B()
@@ -174,7 +174,7 @@ nmodes = 5
 
 
 print('Solving Eigenvalue')
-date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 print(date_str)
 eigval_, Vp = sparse.linalg.eigsh(Dp,k=nmodes)
 val_p = np.sort(1/eigval_)
@@ -182,14 +182,14 @@ freq_p = np.sqrt(val_p)/(2.0*np.pi)
 
 
 print('Salving solution')
-date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 print(date_str)
 
 save_object(Vp,'Vp.pkl')
 save_object(eigval_,'eigval_.pkl')
 
 print('Solving Eigenvalue')
-date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 print(date_str)
 
 Vprimal = Lexp.dot(Vp)
@@ -222,5 +222,5 @@ def plot_system_list(system_list,mode_id):
 #P = sparse.LinearOperator(shape=K.shape, matvec = lambda x : x - B.T.dot(BBT_inv_tilde.dot(B.dot(x))))
 
 print('End')
-date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S'
+date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 print(date_str)

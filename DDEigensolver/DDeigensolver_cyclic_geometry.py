@@ -169,7 +169,7 @@ save_object(Lexp,'Lexp.pkl')
 Kp = L.dot(K.dot(Lexp))
 Mp = L.dot(M.dot(Lexp))
 lu = sparse.splu(Kp)
-Dp = sparse.LinearOperator(shape=Kp.shape, matvec lambda : x lu.solve(Mp.dot(x)))
+Dp = sparse.LinearOperator(shape=Kp.shape, matvec = lambda  x : lu.solve(Mp.dot(x)))
 nmodes = 5
 
 

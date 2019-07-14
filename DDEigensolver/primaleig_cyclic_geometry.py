@@ -11,8 +11,11 @@ import copy
 import time
 from datetime import datetime
 
-date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-print(date_str)
+def print_date():
+    date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    print(date_str)
+
+print_date()
 
 Nsectors = 24
 domain_label = 4
@@ -60,20 +63,19 @@ print(date_str)
 
 
 
-load_object('B.pkl')
-load_object('M.pkl')
-load_object('K.pkl')
-
-
-
+B = load_object('B.pkl')
+M = load_object('M.pkl')
+K = load_object('K.pkl')
 L = load_object('L.pkl')
 Lexp = load_object('Lexp.pkl')
 
 
+print('Assembling primal operator')
+print_date()
 Kp = L.dot(K.dot(Lexp))
 Mp = L.dot(M.dot(Lexp))
 lu = sparse.linalg.splu(Kp.tocsc())
-Dp = sparse.LinearOperator(shape=Kp.shape, matvec = lambda  x : lu.solve(Mp.dot(x)))
+Dp = sparse.linalg.LinearOperator(shape=Kp.shape, matvec = lambda  x : lu.solve(Mp.dot(x)))
 nmodes = 5
 
 

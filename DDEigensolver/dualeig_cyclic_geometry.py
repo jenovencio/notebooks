@@ -130,7 +130,7 @@ for i,mi in enumerate(mesh_list):
     minus = -1
     local_index = i+1
     if i+2>Nsectors:
-        plus = -1
+        plus = -23
 
     if i-1<0:
         minus = +23
@@ -147,6 +147,7 @@ feti_obj1 = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=1.0e-12)
 feti_obj2 = SerialFETIsolver(M_dict,B_dict,f_dict,tolerance=1.0e-12)
 manager = feti_obj1.manager 
 managerM = feti_obj2.manager
+manager.build_local_to_global_mapping()
 
 print('Loading Matrix')
 date_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
@@ -180,11 +181,12 @@ def plot_system_list(system_list,mode_id):
 #system_list = update_system(system_list,Vprimal)
 
 
-BBT_inv = np.linalg.pinv(B.A.dot(B.A.T))
+BBT_inv_lu = sparse.linalg.splu(B.dot(B.T))
+
 #scaling = manager.assemble_global_scaling()
 #S = np.diag(1./scaling)
 #BBT_inv_tilde = B.dot(S).dot(S.dot(B.T))
-BBT_inv_tilde = BBT_inv
+BBT_inv_tilde = sparse.linalg.LinearOperator(shape=(B.shape[0],B.shape[0]), matvec = lambda x : BBT_inv_lu.solve(x) )
 P = sparse.linalg.LinearOperator(shape=K.shape, matvec = lambda x : x - B.T.dot(BBT_inv_tilde.dot(B.dot(x))))
 
 
@@ -200,7 +202,6 @@ def system_without_projection(u,tol=1.0e-8):
     countswp+=1
     return solution_obj.displacement
     
-un = system_without_projection(u0)
 D_wp = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system_without_projection(x))
 
 nmodes = 30

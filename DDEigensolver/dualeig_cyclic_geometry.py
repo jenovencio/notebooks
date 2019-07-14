@@ -143,8 +143,8 @@ for i,mi in enumerate(mesh_list):
 
     f_dict[local_index] = np.zeros(K1.shape[0])
 
-feti_obj1 = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=1.0e-12)
-feti_obj2 = SerialFETIsolver(M_dict,B_dict,f_dict,tolerance=1.0e-12)
+feti_obj1 = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=1.0e-12,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
+feti_obj2 = SerialFETIsolver(M_dict,B_dict,f_dict,tolerance=1.0e-12,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
 manager = feti_obj1.manager 
 managerM = feti_obj2.manager
 manager.build_local_to_global_mapping()
@@ -196,7 +196,7 @@ def system_without_projection(u,tol=1.0e-8):
     global countswp
     f = M.dot(u)
     f_dict = manager.vector2localdict(f,manager.global2local_primal_dofs)
-    feti_obj = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=tol)
+    feti_obj = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=tol,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
     solution_obj = feti_obj.solve()
     u_dict = solution_obj.u_dict
     countswp+=1
@@ -225,7 +225,7 @@ def system(u,tol=1.0e-8):
     global counts
     f = P.T.dot(M.dot(P.dot(u)))
     f_dict = manager.vector2localdict(f,manager.global2local_primal_dofs)
-    feti_obj = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=tol)
+    feti_obj = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=tol,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
     solution_obj = feti_obj.solve()
     u_dict = solution_obj.u_dict
     counts+=1

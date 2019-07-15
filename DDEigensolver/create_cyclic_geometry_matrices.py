@@ -32,7 +32,7 @@ def load_pkl(variable_name):
 
 def create(case_id):
 
-    case_folder = 'case_' +  str(case_id):
+    case_folder = 'case_' +  str(case_id)
     try:
         os.mkdir(case_folder)
     except:

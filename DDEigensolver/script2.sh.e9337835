@@ -1,2 +1,0 @@
-/var/spool/PBS/mom_priv/jobs/9337835.isrv5.SC: line 1: cd: dev/notebook/DDeigensolver: No such file or directory
-python: can't open file 'dualeig_cyclic_geometry.py': [Errno 2] No such file or directory

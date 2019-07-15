@@ -1,4 +1,4 @@
-cd /home/jenovencio/dev/notebook/DDEigensolver
+cd dev/notebook/DDEigensolver
 ml Anaconda3
-ml MPICH
-bash run_mpi.sh
+source activate ge72tih
+python create_cyclic_geometry_matrices.py

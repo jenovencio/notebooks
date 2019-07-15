@@ -76,7 +76,7 @@ Kp = L.dot(K.dot(Lexp))
 Mp = L.dot(M.dot(Lexp))
 lu = sparse.linalg.splu(Kp.tocsc())
 Dp = sparse.linalg.LinearOperator(shape=Kp.shape, matvec = lambda  x : lu.solve(Mp.dot(x)))
-nmodes = 5
+nmodes = 30
 
 
 print('Solving Eigenvalue')

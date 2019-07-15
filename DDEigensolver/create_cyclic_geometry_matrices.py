@@ -32,13 +32,13 @@ def load_pkl(variable_name):
 
 def create(case_id):
 
-    case_folder = 'case_' +  str(case_id)
+    case_folder = 'case_' +  str(case_id):
     try:
         os.mkdir(case_folder)
     except:
         pass
 
-    m1 = load_mkl('3D_simple_bladed_disk_24_sectors_' + str(case_id) + '_nodes.pkl')
+    m1 = load_pkl('3D_simple_bladed_disk_24_sectors_' + str(case_id) + '_nodes.pkl')
     m1.change_tag_in_eldf('phys_group','RIGHT_ELSET',cyclic_right_label)
     m1.change_tag_in_eldf('phys_group','LEFT_ELSET',cyclic_left_label )
     m1.change_tag_in_eldf('phys_group','BODY_1_1_SOLID_ELSET',domain_label)

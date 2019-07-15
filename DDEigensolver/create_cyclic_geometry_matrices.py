@@ -7,7 +7,7 @@ from scipy import sparse
 import amfe
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
+import os, copy
 import time
 from datetime import datetime
 
@@ -24,6 +24,12 @@ tol_radius = 1.0e-5
 dimension=3
 
 
+def filepath(filename):
+    return os.path.join('meshes',filename)
+
+def load_pkl(variable_name):
+    return load_object(filepath(variable_name))
+
 def create(case_id):
 
     case_folder = 'case_' +  case_id
@@ -32,8 +38,7 @@ def create(case_id):
     except:
         pass
 
-    m1 = load_object('3D_simple_bladed_disk_24_sectors_' + str(case_id) + '_nodes.pkl')
-
+    m1 = load_mkl('3D_simple_bladed_disk_24_sectors_' + str(case_id) + '_nodes.pkl')
     m1.change_tag_in_eldf('phys_group','RIGHT_ELSET',cyclic_right_label)
     m1.change_tag_in_eldf('phys_group','LEFT_ELSET',cyclic_left_label )
     m1.change_tag_in_eldf('phys_group','BODY_1_1_SOLID_ELSET',domain_label)

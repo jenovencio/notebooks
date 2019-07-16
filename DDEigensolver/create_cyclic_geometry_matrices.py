@@ -151,10 +151,11 @@ def create(case_id):
     save_object(L,os.path.join(case_folder,'L.pkl'))
     save_object(Lexp,os.path.join(case_folder,'Lexp.pkl'))
 
-    save_object(feti_obj1,os.path.join(case_folder,'feti_obj1.pkl'))
-    save_object(feti_obj2,os.path.join(case_folder,'feti_obj2.pkl'))
-    save_object(manager,os.path.join(case_folder,'manager.pkl'))
-    save_object(managerM,os.path.join(case_folder,'managerM.pkl'))
+
+    save_object(K_dict,os.path.join(case_folder,'K_dict.pkl'))
+    save_object(M_dict,os.path.join(case_folder,'M_dict.pkl'))
+    save_object(B_dict,os.path.join(case_folder,'B_dict.pkl'))
+    save_object(f_dict,os.path.join(case_folder,'f_dict.pkl'))
 
 
     print('End')

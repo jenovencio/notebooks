@@ -38,20 +38,21 @@ dirichlet_label = 1
 unit='deg'
 tol_radius = 1.0e-5
 dimension=3
+FETI_tolerance = 1.0E-8
 
 
-feti_obj1 = load_pkl('feti_obj1.pkl')
-feti_obj2 = load_pkl('feti_obj2.pkl')
-manager =  load_pkl('manager.pkl')
-managerM = load_pkl('managerM.pkl')
 
 B = load_pkl('B.pkl')
 K = load_pkl('K.pkl')
 M = load_pkl('M.pkl')
+K_dict = load_pkl('K_dict.pkl')
+M_dict = load_pkl('M_dict.pkl')
+B_dict = load_pkl('B_dict.pkl')
+f_dict = load_pkl('f_dict.pkl')
 
-K_dict = feti_obj1.K_dict
-M_dict = feti_obj2.K_dict
-B_dict = feti_obj1.B_dict
+feti_obj = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=FETI_tolerance,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
+manager = feti_obj.manager 
+manager.build_local_to_global_mapping()
 
 print_date('Loading Matrix')
 BBT_inv_lu = sparse.linalg.splu(B.dot(B.T))
@@ -71,7 +72,7 @@ def system_without_projection(u,tol=1.0e-8):
     countswp+=1
     return solution_obj.displacement
     
-D_wp = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system_without_projection(x))
+D_wp = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system_without_projection(x,FETI_tolerance))
 
 nmodes = 30
 np.random.seed(1)
@@ -101,7 +102,7 @@ def system(u,tol=1.0e-8):
     return solution_obj.displacement
 
 
-D = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system(x))
+D = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system(x,FETI_tolerance))
 
 print_date('Solving Projected Dual Eigenproblem')
 eigval, V = sparse.linalg.eigs(D,k=nmodes,v0 = P.dot(u0))

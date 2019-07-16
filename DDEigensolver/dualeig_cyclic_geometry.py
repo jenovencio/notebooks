@@ -49,6 +49,10 @@ B = load_pkl('B.pkl')
 K = load_pkl('K.pkl')
 M = load_pkl('M.pkl')
 
+K_dict = feti_obj1.K_dict
+M_dict = feti_obj2.K_dict
+B_dict = feti_obj1.B_dict
+
 print_date('Loading Matrix')
 BBT_inv_lu = sparse.linalg.splu(B.dot(B.T))
 BBT_inv_tilde = sparse.linalg.LinearOperator(shape=(B.shape[0],B.shape[0]), matvec = lambda x : BBT_inv_lu.solve(x) )

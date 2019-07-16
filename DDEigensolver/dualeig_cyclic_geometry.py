@@ -85,8 +85,8 @@ val_wp_ = np.sort(1/eigval_without_projection_.real)
 freq_dual_wp_ = np.sqrt(val_wp_)/(2.0*np.pi)
 freq_dual_wp_
 
-save_object(V_wp_,'V_wp_.pkl')
-save_object(eigval_without_projection_,'eigval_without_projection_.pkl')
+save_pkl(V_wp_,'V_wp_.pkl')
+save_pkl(eigval_without_projection_,'eigval_without_projection_.pkl')
 
 
 counts=0
@@ -109,7 +109,7 @@ val = np.sort(1/eigval.real)
 freq_dual = np.sqrt(val)/(2.0*np.pi)
 freq_dual
 
-save_object(V,'V.pkl')
-save_object(eigval,'eigval.pkl')
+save_pkl(V,'V.pkl')
+save_pkl(eigval,'eigval.pkl')
 
 print_date('End')

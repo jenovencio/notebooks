@@ -38,7 +38,7 @@ dirichlet_label = 1
 unit='deg'
 tol_radius = 1.0e-5
 dimension=3
-FETI_tolerance = 1.0E-12
+FETI_tolerance = 1.0E-10
 
 
 
@@ -53,11 +53,14 @@ f_dict = load_pkl('f_dict.pkl')
 feti_obj = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=FETI_tolerance,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
 manager = feti_obj.manager 
 manager.build_local_to_global_mapping()
+scaling = manager.assemble_global_scaling()
+S = sparse.diags(1./scaling)
+P = sparse.eye(K.shape[0]) - S.dot(B_.T.dot(B_))
 
 print_date('Loading Matrix')
-BBT_inv_lu = sparse.linalg.splu(B.dot(B.T))
-BBT_inv_tilde = sparse.linalg.LinearOperator(shape=(B.shape[0],B.shape[0]), matvec = lambda x : BBT_inv_lu.solve(x) )
-P = sparse.linalg.LinearOperator(shape=K.shape, matvec = lambda x : x - B.T.dot(BBT_inv_tilde.dot(B.dot(x))))
+#BBT_inv_lu = sparse.linalg.splu(B.dot(B.T))
+#BBT_inv_tilde = sparse.linalg.LinearOperator(shape=(B.shape[0],B.shape[0]), matvec = lambda x : BBT_inv_lu.solve(x) )
+#P = sparse.linalg.LinearOperator(shape=K.shape, matvec = lambda x : x - B.T.dot(BBT_inv_tilde.dot(B.dot(x))))
 
 
 countswp=0
@@ -72,7 +75,7 @@ def system_without_projection(u,tol=1.0e-8):
     countswp+=1
     return solution_obj.displacement
     
-D_wp = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system_without_projection(x,FETI_tolerance))
+D_wp = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system_without_projection(x,tol=FETI_tolerance))
 
 nmodes = 30
 np.random.seed(1)
@@ -93,7 +96,7 @@ save_pkl(eigval_without_projection_,'eigval_without_projection_.pkl')
 counts=0
 def system(u,tol=1.0e-8):
     global counts
-    f = P.dot(M.dot(P.dot(u)))
+    f = P.T.dot(M.dot(P.dot(u)))
     f_dict = manager.vector2localdict(f,manager.global2local_primal_dofs)
     feti_obj = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=tol,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
     solution_obj = feti_obj.solve()
@@ -102,7 +105,7 @@ def system(u,tol=1.0e-8):
     return solution_obj.displacement
 
 
-D = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system(x,FETI_tolerance))
+D = sparse.linalg.LinearOperator(shape=M.shape,matvec = lambda x : system(x,tol=FETI_tolerance))
 
 print_date('Solving Projected Dual Eigenproblem')
 eigval, V = sparse.linalg.eigs(D,k=nmodes,v0 = P.dot(u0))

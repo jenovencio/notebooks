@@ -7,7 +7,7 @@ from scipy import sparse
 import amfe
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
+import os, copy
 import time
 from datetime import datetime
 

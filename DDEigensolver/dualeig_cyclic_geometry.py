@@ -38,7 +38,7 @@ dirichlet_label = 1
 unit='deg'
 tol_radius = 1.0e-5
 dimension=3
-FETI_tolerance = 1.0E-8
+FETI_tolerance = 1.0E-12
 
 
 

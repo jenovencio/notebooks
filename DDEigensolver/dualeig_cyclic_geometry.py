@@ -92,7 +92,7 @@ save_object(eigval_without_projection_,'eigval_without_projection_.pkl')
 counts=0
 def system(u,tol=1.0e-8):
     global counts
-    f = P.T.dot(M.dot(P.dot(u)))
+    f = P.dot(M.dot(P.dot(u)))
     f_dict = manager.vector2localdict(f,manager.global2local_primal_dofs)
     feti_obj = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=tol,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
     solution_obj = feti_obj.solve()

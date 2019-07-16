@@ -28,7 +28,7 @@ def load_pkl(variable_name):
     return load_object(filepath(variable_name))
 
 def save_pkl(variable, variable_name):
-    return sabe_object(variable, filepath(variable_name))
+    return save_object(variable, filepath(variable_name))
 
 Nsectors = 24
 domain_label = 4

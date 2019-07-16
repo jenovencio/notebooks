@@ -128,8 +128,8 @@ def create(case_id):
 
         f_dict[local_index] = np.zeros(K1.shape[0])
 
-    feti_obj1 = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=1.0e-12)
-    feti_obj2 = SerialFETIsolver(M_dict,B_dict,f_dict,tolerance=1.0e-12)
+    feti_obj1 = SerialFETIsolver(K_dict,B_dict,f_dict,tolerance=1.0e-12,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
+    feti_obj2 = SerialFETIsolver(M_dict,B_dict,f_dict,tolerance=1.0e-12,pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-8})
     manager = feti_obj1.manager 
     managerM = feti_obj2.manager
     manager.build_local_to_global_mapping()
@@ -144,8 +144,6 @@ def create(case_id):
     M = M_
     L = manager.assemble_global_L()
     Lexp = manager.assemble_global_L_exp()
-
-
 
     save_object(B,os.path.join(case_folder,'B.pkl'))
     save_object(M,os.path.join(case_folder,'M.pkl'))

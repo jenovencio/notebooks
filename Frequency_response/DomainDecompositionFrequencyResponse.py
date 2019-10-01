@@ -11,6 +11,37 @@ import time
 #from numba import jit, njit, prange
 #from numba.typed import Dict, List
 
+def GMRes(A, b, x0, e, nmax_iter, restart=None):
+    r = b - np.asarray(np.dot(A, x0)).reshape(-1)
+
+    x = []
+    q = [0] * (nmax_iter)
+
+    x.append(r)
+
+    q[0] = r / np.linalg.norm(r)
+
+    h = np.zeros((nmax_iter + 1, nmax_iter))
+
+    for k in range(nmax_iter):
+        y = np.asarray(np.dot(A, q[k])).reshape(-1)
+
+        for j in range(k+1):
+            h[j, k] = np.dot(q[j], y)
+            y = y - h[j, k] * q[j]
+        h[k + 1, k] = np.linalg.norm(y)
+        if (h[k + 1, k] != 0 and k != nmax_iter - 1):
+            q[k + 1] = y / h[k + 1, k]
+
+        b = np.zeros(nmax_iter + 1)
+        b[0] = np.linalg.norm(r)
+
+        result = np.linalg.lstsq(h, b)[0]
+
+        x.append(np.dot(np.asarray(q).transpose(), result) + x0)
+
+    return x
+
 def timing(f):
     def wrap(*args):
         time1 = time.time()
@@ -59,6 +90,10 @@ class LO(sparse.linalg.LinearOperator):
         self.count += 1
         return self._matvec_func(v)
 
+    def _matmat(self,v):
+        self.count += 1
+        return self._matvec_func(v)
+
 #@jit(parallel=False)
 def numbadot(K_dict,vdict,n):
     u_dict = {}
@@ -80,17 +115,17 @@ def eig2freq(eigval_,Vp):
     return freq_p, Vp
 
 #alpha=0.00005,beta=0.0000001
-buildZ = lambda w,M,K,alpha=0.00005,beta=0.0000001 : -w**2*M + K + 1J*w*(alpha*K + beta*M)
-def build_Z_dict(w,M_dict,K_dict):
+buildZ = lambda w,M,K,alpha=0.0005,beta=0.00001 : -w**2*M + K + 1J*w*(alpha*K + beta*M)
+def build_Z_dict(w,M_dict,K_dict,alpha=0.0005,beta=0.00001):
     Z_dict = {}
     for key, K in K_dict.items():
-        Z_dict[key] = buildZ(w,M_dict[key],K)  
+        Z_dict[key] = buildZ(w,M_dict[key],K,alpha,beta)  
     return Z_dict
 
 width = 8.
 heigh = 2.
-divX=11
-divY=3
+divX=21
+divY=6
 dobj = DomainCreator(width=width,heigh=heigh,x_divisions=divX,y_divisions=divY)
 mesh_file = 'mesh.msh'
 dobj.save_gmsh_file(mesh_file)
@@ -99,7 +134,7 @@ m1 = amfe.Mesh()
 m1.import_msh(mesh_file)
 
 
-domains_X = 1
+domains_X = 2
 domains_Y = 1
 n_domains = domains_X*domains_Y 
 base = np.array([1,1,1])
@@ -204,6 +239,15 @@ for i in range(len(mesh_list)):
 K, f = manager.assemble_global_K_and_f()
 M, _ = managerM.assemble_global_K_and_f()
 B = manager.assemble_global_B()
+R = manager.assemble_global_kernel()
+G = manager.assemble_G()
+GGT = manager.assemble_GGT()
+S = manager.assemble_global_scaling()
+
+GGT_inv = np.linalg.inv(GGT.A)
+BTB_inv = np.linalg.pinv((B.T@B).A)
+e = BTB_inv.diagonal() - 1/S
+
 BBT_inv = sparse.csc_matrix(np.linalg.pinv(B.dot(B.T).A))
 P = sparse.eye(K.shape[0]) - B.T.dot(BBT_inv.dot(B))
 L = manager.assemble_global_L()
@@ -216,7 +260,7 @@ Dp = sparse.linalg.LinearOperator(shape=Kp.shape, matvec = lambda x : lu.solve(M
 eigval, V = sparse.linalg.eigsh(Dp,k=10)
 freq,V = eig2freq(eigval,V)
 
-f_ = 0.0001*L.dot(f)
+f_ = 1.0E5*L.dot(f)
 #f_ = V.dot(100*np.ones(V.shape[1]))
 #f_ = V[:,5]
 f = Lexp.dot(f_)
@@ -224,14 +268,17 @@ f = Lexp.dot(f_)
 
 
 class FETI_system():
-    def __init__(self,Z_dict,B_dict,f_dict,tol=1.0e-12,dtype=np.float):
+    def __init__(self,Z_dict,B_dict,f_dict,tol=1.0e-3,dtype=np.float,dual_interface_algorithm='PCPG'):
         #f_dict = manager.vector2localdict(f,manager.global2local_primal_dofs)
         #self.feti_obj = SerialFETIsolver(Z_dict,B_dict,f_dict,tolerance=tol,dtype=np.complex)
         #self.mapdict = manager.local2global_primal_dofs
         self.Z_dict = Z_dict
         self.B_dict = B_dict 
         self.tol = tol
-        self.feti_obj = SerialFETIsolver(self.Z_dict,self.B_dict,f_dict,tolerance=self.tol,dtype=dtype)
+        self.feti_obj = SerialFETIsolver(self.Z_dict,self.B_dict,f_dict,
+                                        tolerance=self.tol,dtype=dtype,max_int=100,
+                                        dual_interface_algorithm=dual_interface_algorithm,
+                                        pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-12})
         self.dtype = dtype
 
     def apply(self,f):
@@ -245,7 +292,10 @@ class FETI_system():
     def array2dict(self,v):
         v_dict = {}
         for key, posid in mapdict.items():
-            v_dict[key] = v[posid]
+            if v.ndim<2:
+                v_dict[key] = v[posid]
+            else:
+                v_dict[key] = v[posid,:]
         return v_dict 
     
     def dict2array(self,v_dict):
@@ -255,17 +305,34 @@ class FETI_system():
         return v
 
 
+def array2dict(v):
+    v_dict = {}
+    for key, posid in mapdict.items():
+        if v.ndim<2:
+            v_dict[key] = v[posid]
+        else:
+            v_dict[key] = v[posid,:]
+    return v_dict 
+
+
 mapdict = manager.local2global_primal_dofs
 usize = manager.primal_size
-def create_FETI_operator(Z_dict,B_dict,dtype=np.complex):
-    FETIobj = FETI_system(Z_dict,B_dict,f_dict,dtype=dtype)
+def create_FETI_operator(Z_dict,B_dict,dtype=np.complex,dual_interface_algorithm='PCPG'):
+    FETIobj = FETI_system(Z_dict,B_dict,f_dict,dtype=dtype,dual_interface_algorithm=dual_interface_algorithm)
     return LO(lambda x : FETIobj.apply(x), shape=(usize,usize),dtype=dtype)
 
-w = 70
+w = 0.0
 Z_dict = build_Z_dict(w,M_dict,K_dict)
 FETIop = create_FETI_operator(Z_dict,B_dict)
-fc = f + 0.0*1J*f
+#fc = f + 0.0*1J*f
+#fc1 = 2*f + 0.0*1J*f
 #e1 = FETIop.dot(fc)
+#e2 = FETIop.dot(fc1)
+#e3 = FETIop.dot(np.array([fc,fc1]).T)
+#error1 = np.abs(e1 - e3[:,0])
+#error2 = np.abs(e2 - e3[:,1])
+
+
 
 @timing
 def primal_sys(w_list):
@@ -286,36 +353,42 @@ def proj_sys(w_list):
     u_list = []
     u_init = np.zeros(K.shape[0])
     update = True
+    number_of_iterations_list = []
     count=0
     for i in range(2*len(w_list)):
         w = w_list[count]
-        Z = buildZ(w,M,K,alpha=0.0,beta=0.0)
+        Z = buildZ(w,M,K)
         Zp = P.T.dot(Z.dot(P))
+        Z_action = LO(lambda x : Zp.dot(x), shape=Z.shape, dtype=Z.dtype)
+
         if update:
             #lu = sparse.linalg.splu(Z)
             #Dp = LO(lambda x : P.T.dot(lu.solve(P.dot(x))), shape=Z.shape, dtype=Z.dtype)
             #u_init = Dp.dot(f)
             pass
-        
-        #Z_action = LO(lambda x : Zp.dot(x), shape=Z.shape, dtype=Z.dtype)
+            
         error = Z_action.dot(u_init) - fp
-        usol, info = sparse.linalg.cg(Z,fp,x0=u_init) #maxiter=100,tol=1.0E-10
+        usol, info = sparse.linalg.gmres(Z_action,fp,x0=u_init, tol=1.0E-6)
+        number_of_iterations_list.append(Z_action.count)
+        error2 = Z_action.dot(usol) - fp
+        
         if info!=0:
             update=True
-            continue
-        
-        update=False
-        u_init = usol
-        count+=1
-
-        u0 = usol
-        
-        u_list.append(u0)
-        
+            if np.linalg.norm(error)>np.linalg.norm(error2):
+                u_init = usol
+            else:
+                u_list.append(u_init)
+                count+=1
+        else:
+            update=False
+            u_init = usol
+            u_list.append(usol)
+            count+=1
+            
         if w==w_list[-1]:
             break
 
-    return u_list
+    return u_list, number_of_iterations_list 
 
 
 @timing
@@ -325,26 +398,38 @@ def proj_feti_sys(w_list):
     update = True
     count=0
     fc = f + 0.0*1J*f
+    fp = P.T.dot(fc)
+    number_of_iterations_list = []
     for i in range(2*len(w_list)):
         w = w_list[count]
         Z = buildZ(w,M,K)
         Zp = P.T.dot(Z.dot(P))
         if update:
-            #Z_dict = build_Z_dict(w,M_dict,K_dict)
-            #FETIop = create_FETI_operator(Z_dict,B_dict,dtype=np.complex)
-            #u_init = P.dot(FETIop.dot(fc))
-            pass
+            Z_dict = build_Z_dict(w,M_dict,K_dict,alpha=0.0,beta=0.0)
+            FETIop = create_FETI_operator(Z_dict,B_dict,dtype=np.complex)
+            F = sparse.linalg.LinearOperator(shape=FETIop.shape,dtype=FETIop.dtype, matvec = lambda x : P.dot(FETIop.dot(x)))
+            u_init = F.dot(fp)
             
-        fp = P.T.dot(f)
         Z_action = LO(lambda x : Zp.dot(x), shape=Z.shape, dtype=Z.dtype)
         error = Z_action.dot(u_init) - fp
-        usol, info = sparse.linalg.lgmres(Z_action,fp,x0=u_init,maxiter=300,tol=1.0E-3)
-        Z_action.count
+        #usol, info = sparse.linalg.lgmres(Z_action,fp,x0=u_init,maxiter=60,tol=1.0E-6)
+        usol, info = sparse.linalg.lgmres(Z_action,fp,x0=u_init,maxiter=300,tol=1.0E-6,M=F)
+        number_of_iterations_list.append(Z_action.count)
+        #usol = P.dot(FETIop.dot(fp))
+        error = np.linalg.norm(Z_action.dot(usol) - fp)/np.linalg.norm(fp)
+
+        #info=0
+        #Z_action.count
         if info!=0:
             update=True
             continue
         
-        update=False
+        elif Z_action.count>30:
+            update=True
+
+        else:
+            update=False
+
         u_init = usol
         count+=1
 
@@ -355,15 +440,144 @@ def proj_feti_sys(w_list):
         if w==w_list[-1]:
             break
 
+    return u_list, number_of_iterations_list
+
+
+
+
+@timing
+def proj_feti_gmres_sys(w_list):
+    u_list = []
+    u_init = np.zeros(K.shape[0])
+    update = True
+    count=0
+    fc = f + 0.0*1J*f
+    fp = P.T.dot(fc)
+    number_of_iterations_list = []
+    for i in range(2*len(w_list)):
+        w = w_list[count]
+        Z = buildZ(w,M,K)
+        Zp = P.T.dot(Z.dot(P))
+        if update:
+            Z_dict = build_Z_dict(w,M_dict,K_dict)
+            FETIop = create_FETI_operator(Z_dict,B_dict,dtype=np.complex,dual_interface_algorithm='PGMRES')
+            F = sparse.linalg.LinearOperator(shape=FETIop.shape,dtype=FETIop.dtype, matvec = lambda x : P.dot(FETIop.dot(x)))
+            u_init = F.dot(fp)
+            
+        Z_action = LO(lambda x : Zp.dot(x), shape=Z.shape, dtype=Z.dtype)
+        error = Z_action.dot(u_init) - fp
+        #usol, info = sparse.linalg.lgmres(Z_action,fp,x0=u_init,maxiter=60,tol=1.0E-6)
+        usol, info = sparse.linalg.gmres(Z_action,fp,x0=u_init,maxiter=300,tol=1.0E-6,M=F)
+        number_of_iterations_list.append(Z_action.count)
+        #usol = P.dot(FETIop.dot(fp))
+        error = np.linalg.norm(Z_action.dot(usol) - fp)/np.linalg.norm(fp)
+
+        #info=0
+        #Z_action.count
+        if info!=0:
+            update=True
+            continue
+
+        elif Z_action.count>10:
+            update=True
+
+        else:
+            update=False
+        u_init = usol
+        count+=1
+
+        u0 = usol
+        
+        u_list.append(u0)
+        
+        if w==w_list[-1]:
+            break
+
+    return u_list, number_of_iterations_list
+
+
+
+@timing
+def feti_sys(w_list):
+    u_list = []
+    u_init = np.zeros(K.shape[0])
+    update = True
+    count=0
+    fc = f + 0.0*1J*f
+    fp = P.T.dot(fc)
+    for i in range(2*len(w_list)):
+        w = w_list[count]
+        #Z = buildZ(w,M,K,alpha=0.0001)
+        Zp = buildZ(w,Mp,Kp)
+        usol = sparse.linalg.spsolve(Zp,L.dot(fp))
+        u0 = Lexp.dot(usol)
+        
+        Z_dict = build_Z_dict(w,M_dict,K_dict)
+        FETIop = create_FETI_operator(Z_dict,B_dict,dtype=np.complex)
+        F = sparse.linalg.LinearOperator(shape=FETIop.shape,dtype=FETIop.dtype, matvec = lambda x : P.dot(FETIop.dot(x)))
+            
+        u_dual = F.dot(fp)
+        u_list.append(u_dual)
+        error = np.abs(u_dual - u0)
+        count+=1
+        
+        if w==w_list[-1]:
+            break
+
     return u_list
 
-def plot(w_list,u_list,dof_id=20,title=''):
+
+@timing
+def feti_gmres_sys(w_list):
+    u_list = []
+    u_init = np.zeros(K.shape[0])
+    update = True
+    count=0
+    fc = f + 0.0*1J*f
+    fp = P.T.dot(fc)
+    for i in range(2*len(w_list)):
+        w = w_list[count]
+        #Z = buildZ(w,M,K,alpha=0.0001)
+        Zp = buildZ(w,Mp,Kp)
+        Z = buildZ(w,M,K)
+        Zinv = sparse.linalg.inv(Z)
+        d = B@Zinv@fp
+        F  = B@Zinv@B.T 
+        lsol = sparse.linalg.spsolve(F,d) 
+        u = Zinv@(fp - B.T.dot(lsol))
+        usol = sparse.linalg.spsolve(Zp,L.dot(fp))
+        u0 = Lexp.dot(usol)
+        
+        Z_dict = build_Z_dict(w,M_dict,K_dict)
+        '''
+        f_dict = array2dict(fp)
+        feti_obj = SerialFETIsolver(Z_dict,B_dict,f_dict,
+                                        tolerance=1.0E-12,dtype=np.complex,max_int=100,
+                                        dual_interface_algorithm='PGMRES',pseudoinverse_kargs={'method':'splusps','tolerance':1.0E-12})
+
+        feti_obj.manager._build_local_matrix()
+        F2 = feti_obj.manager.assemble_global_F()
+        d2 = feti_obj.manager.assemble_global_d()
+        '''
+
+        FETIop = create_FETI_operator(Z_dict,B_dict,dtype=np.complex,dual_interface_algorithm='PGMRES')
+        F = sparse.linalg.LinearOperator(shape=FETIop.shape,dtype=FETIop.dtype, matvec = lambda x : P.dot(FETIop.dot(x)))
+            
+        u_dual = F.dot(fp)
+        u_list.append(u_dual)
+        error = np.abs(u_dual - u0)/np.linalg.norm(u0)
+        count+=1
+        
+        if w==w_list[-1]:
+            break
+
+    return u_list
+
+def plot(w_list,u_list,dof_id=121,title=''):
     plt.figure()
     plt.plot(w_list,np.abs(np.array(u_list)[:,dof_id]),'o-')
     plt.yscale('log')
     plt.title(title)
-
-
 
 @timing
 def iter_primal_sys(w_list):
@@ -383,13 +597,18 @@ def iter_primal_sys(w_list):
             Zprec_inv = sparse.linalg.LinearOperator(shape=Zprec.shape, matvec = lambda x : lu.solve(x))
             u_init = Zprec_inv.dot(f_)
 
-        #usol, info = sparse.linalg.cg(Z_action,f_,x0=u_init,M=Zprec_inv,maxiter=30)
-        usol, info = sparse.linalg.cg(Z_action,f_)
+        usol, info = sparse.linalg.gmres(Z_action,f_,x0=u_init,M=Zprec_inv,maxiter=300)
+        #usol, info = sparse.linalg.cg(Z_action,f_)
+
         number_of_iterations_list.append(Z_action.count)
         if info>0:
             update = True
             continue
 
+        elif Z_action.count>10: 
+            update = True
+            u_init = usol
+            count+=1
         else:
             update = False
             u_init = usol
@@ -400,7 +619,35 @@ def iter_primal_sys(w_list):
         #u_obj_list.append(np.abs(B_obj.dot(u_dict[3])[1]))
         if w == w_list[-1]:
             break
-    return u_list
+    return u_list, number_of_iterations_list
+
+
+@timing
+def iter_primal_sys_without_precond(w_list):
+    u_list = []
+    update = True
+    u_init = np.zeros(Kp.shape[0])
+    max_int = len(w_list)*2
+    count = 0
+    number_of_iterations_list = []
+    for i in range(max_int):
+        w = w_list[count]
+        Z = buildZ(w,Mp,Kp)
+        Z_action = LO(lambda x : Z.dot(x), shape=Z.shape, dtype=Z.dtype)
+        
+        usol, info = sparse.linalg.lgmres(Z_action,f_,x0=u_init,maxiter=300)
+        #usol, info = sparse.linalg.cg(Z_action,f_)
+
+        number_of_iterations_list.append(Z_action.count)
+        u_init =  usol
+        count+=1
+
+        u0 = Lexp.dot(usol)
+        u_list.append(u0)
+        #u_obj_list.append(np.abs(B_obj.dot(u_dict[3])[1]))
+        if w == w_list[-1]:
+            break
+    return u_list, number_of_iterations_list
 
 @timing
 def iter_proj_sys(w_list):
@@ -413,16 +660,16 @@ def iter_proj_sys(w_list):
     for i in range(max_int):
         w = w_list[count]
         Z = buildZ(w,Mp,Kp)
-        #Z_action = LO(lambda x : Z.dot(x), shape=Z.shape, dtype=Z.dtype)
+        Z_action = LO(lambda x : Z.dot(x), shape=Z.shape, dtype=Z.dtype)
         if update:
             Zprec = Z
             lu = sparse.linalg.splu(Zprec)
             Zprec_inv = sparse.linalg.LinearOperator(shape=Zprec.shape, matvec = lambda x : lu.solve(x))
             u_init = Zprec_inv.dot(f_)
 
-        #usol, info = sparse.linalg.cg(Z_action,f_,x0=u_init,M=Zprec_inv,maxiter=30)
-        usol, info = sparse.linalg.cg(Z,f_)
-        number_of_iterations_list.append(count)
+        usol, info = sparse.linalg.cg(Z_action,f_,x0=u_init,M=Zprec_inv,maxiter=30)
+        #usol, info = sparse.linalg.cg(Z,f_)
+        number_of_iterations_list.append(Z_action.count)
         if info>0:
             update = True
             continue
@@ -454,25 +701,62 @@ if False:
         e2 = K.dot(f)
         return e2
 
-w_list = np.linspace(0.0,1000,500)
+w_list = np.linspace(1.0,1000,500)
 
     
 #u_list = primal_sys(w_list)
 #plot(w_list,u_list,title='Primal')
 
+'''
+u_list, number_of_iterations_list = iter_primal_sys_without_precond(w_list)
+plot(w_list,u_list,title='Iterative Primal without precond')
 
-u_list = iter_primal_sys(w_list)
+plt.figure()
+plt.plot(number_of_iterations_list,'o')
+plt.title('iteration Primal without precond')
+'''
+
+u_list, number_of_iterations_list = iter_primal_sys(w_list)
 plot(w_list,u_list,title='Iterative Primal')
 
+plt.figure()
+plt.plot(number_of_iterations_list,'o')
+plt.title('iteration Primal with preconditioner')
 
-#u_list = proj_feti_sys(w_list)
-#plot(w_list,u_list,title='FETI-Projected')
-
-#u_list = proj_sys(w_list)
+#u_list, number_of_iterations_list = proj_sys(w_list)
 #plot(w_list,u_list,title='Projected')
 
-u_list = iter_proj_sys(w_list)
-plot(w_list,u_list,title='Projected')
+#plt.figure()
+#plt.plot(number_of_iterations_list,'o')
+#plt.title('iteration Proj without precond')
+
+
+#u_list, number_of_iterations_list = proj_feti_sys(w_list)
+#plot(w_list,u_list,title='FETI-Projected')
+
+#plt.figure()
+#plt.plot(number_of_iterations_list,'o')
+#plt.title('iteration Proj FETI precond')
+
+
+u_list, number_of_iterations_list = proj_feti_gmres_sys(w_list)
+plot(w_list,u_list,title='Projected-FETI-GMRES')
+
+plt.figure()
+plt.plot(number_of_iterations_list,'o')
+plt.title('iteration FETI-GMRES')
+
+#u_list = iter_proj_sys(w_list)
+#plot(w_list,u_list,title='Projected')
+
+#u_list = feti_sys(w_list)
+#plot(w_list,u_list,title='FETI')number_of_iterations_list
+
+#u_list = feti_gmres_sys(w_list)
+#plot(w_list,u_list,title='FETI-GMRES')
+
+
 
 plt.show()
 x=1
+

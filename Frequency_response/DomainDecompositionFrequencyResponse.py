@@ -368,7 +368,8 @@ def proj_sys(w_list):
             pass
             
         error = Z_action.dot(u_init) - fp
-        usol, info = sparse.linalg.gmres(Z_action,fp,x0=u_init, tol=1.0E-6)
+        #usol, info = sparse.linalg.gmres(Z_action,fp,x0=u_init, tol=1.0E-6)
+        usol, info = sparse.linalg.lgmres(Z_action,fp,x0=u_init, tol=1.0E-6)
         number_of_iterations_list.append(Z_action.count)
         error2 = Z_action.dot(usol) - fp
         
@@ -454,6 +455,7 @@ def proj_feti_gmres_sys(w_list):
     fc = f + 0.0*1J*f
     fp = P.T.dot(fc)
     number_of_iterations_list = []
+    num_of_updates = 0
     for i in range(2*len(w_list)):
         w = w_list[count]
         Z = buildZ(w,M,K)
@@ -463,6 +465,7 @@ def proj_feti_gmres_sys(w_list):
             FETIop = create_FETI_operator(Z_dict,B_dict,dtype=np.complex,dual_interface_algorithm='PGMRES')
             F = sparse.linalg.LinearOperator(shape=FETIop.shape,dtype=FETIop.dtype, matvec = lambda x : P.dot(FETIop.dot(x)))
             u_init = F.dot(fp)
+            num_of_updates +=1
             
         Z_action = LO(lambda x : Zp.dot(x), shape=Z.shape, dtype=Z.dtype)
         error = Z_action.dot(u_init) - fp
@@ -478,7 +481,7 @@ def proj_feti_gmres_sys(w_list):
             update=True
             continue
 
-        elif Z_action.count>10:
+        elif Z_action.count>15:
             update=True
 
         else:
@@ -587,6 +590,7 @@ def iter_primal_sys(w_list):
     max_int = len(w_list)*2
     count = 0
     number_of_iterations_list = []
+    num_of_updates = 0
     for i in range(max_int):
         w = w_list[count]
         Z = buildZ(w,Mp,Kp)
@@ -596,6 +600,7 @@ def iter_primal_sys(w_list):
             lu = sparse.linalg.splu(Zprec)
             Zprec_inv = sparse.linalg.LinearOperator(shape=Zprec.shape, matvec = lambda x : lu.solve(x))
             u_init = Zprec_inv.dot(f_)
+            num_of_updates += 1
 
         usol, info = sparse.linalg.gmres(Z_action,f_,x0=u_init,M=Zprec_inv,maxiter=300)
         #usol, info = sparse.linalg.cg(Z_action,f_)
@@ -684,7 +689,7 @@ def iter_proj_sys(w_list):
         #u_obj_list.append(np.abs(B_obj.dot(u_dict[3])[1]))
         if w == w_list[-1]:
             break
-    return u_list
+    return u_list, number_of_iterations_list
 
 if False:
     mapdict = manager.local2global_primal_dofs
@@ -701,20 +706,20 @@ if False:
         e2 = K.dot(f)
         return e2
 
-w_list = np.linspace(1.0,1000,500)
+w_list = np.linspace(1.0,1000,200)
 
     
 #u_list = primal_sys(w_list)
 #plot(w_list,u_list,title='Primal')
 
-'''
+"""
 u_list, number_of_iterations_list = iter_primal_sys_without_precond(w_list)
 plot(w_list,u_list,title='Iterative Primal without precond')
 
 plt.figure()
 plt.plot(number_of_iterations_list,'o')
 plt.title('iteration Primal without precond')
-'''
+
 
 u_list, number_of_iterations_list = iter_primal_sys(w_list)
 plot(w_list,u_list,title='Iterative Primal')
@@ -722,6 +727,7 @@ plot(w_list,u_list,title='Iterative Primal')
 plt.figure()
 plt.plot(number_of_iterations_list,'o')
 plt.title('iteration Primal with preconditioner')
+"""
 
 #u_list, number_of_iterations_list = proj_sys(w_list)
 #plot(w_list,u_list,title='Projected')
@@ -746,11 +752,15 @@ plt.figure()
 plt.plot(number_of_iterations_list,'o')
 plt.title('iteration FETI-GMRES')
 
-#u_list = iter_proj_sys(w_list)
+#u_list, number_of_iterations_list = iter_proj_sys(w_list)
 #plot(w_list,u_list,title='Projected')
 
+#plt.figure()
+#plt.plot(number_of_iterations_list,'o')
+#plt.title('iteration Projected-GMRES')
+
 #u_list = feti_sys(w_list)
-#plot(w_list,u_list,title='FETI')number_of_iterations_list
+#plot(w_list,u_list,title='FETI')
 
 #u_list = feti_gmres_sys(w_list)
 #plot(w_list,u_list,title='FETI-GMRES')

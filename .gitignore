@@ -17,6 +17,7 @@
 *.dat
 *.npz
 *.msh
+*.pkl
 
 # Folders to ignore
 tmp/
